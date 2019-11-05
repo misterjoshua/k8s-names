@@ -1,7 +1,11 @@
 #!/bin/bash -e
 
-function die() {
+function log() {
   echo "$*" >&2
+}
+
+function die() {
+  log "$*"
   exit 1
 }
 
@@ -111,7 +115,9 @@ function projenv() {
 }
 
 function selftest() {
-  # Clear out some env vars that might interfere.
+  log "Performing a self test"
+
+  log "Clearing env vars that might interfere with testing."
   unset TRAVIS_BUILD_NUMBER
   unset TRAVIS_COMMIT
   unset CIRCLE_BUILD_NUM
@@ -119,68 +125,69 @@ function selftest() {
   unset BITBUCKET_BUILD_NUMBER
   unset BITBUCKET_COMMIT
 
-  # Test detecting local k8s servers
-  isLocalK8s "https://127.0.0.1:14443" || die "Didn't detect local k8s server from string"
-  isLocalK8s "https://somecluster.hcp.someregion.azmk8s.io:443" && die "Detected an AKS server as a local k8s"
-  isLocalK8s "" && die "Detected no server name as a local server"
+  log "Testing detecting local k8s servers."
+  isLocalK8s "https://127.0.0.1:14443" || die "Didn't detect local k8s server from string."
+  isLocalK8s "https://somecluster.hcp.someregion.azmk8s.io:443" && die "Detected an AKS server as a local k8s."
+  isLocalK8s "" && die "Detected no server name as a local server."
 
-  # Project root dir should be the pwd when this script is run.
+  log "Testing that project root dir is the pwd when this script is run."
   PROJ_ROOT2=$(projRoot)
-  [ "$PROJ_ROOT2" = "$PROJ_ROOT" ] || die "Project root dir was $PROJ_ROOT2 but it should be $PROJ_ROOT"
+  [ "$PROJ_ROOT2" = "$PROJ_ROOT" ] || die "Project root dir was $PROJ_ROOT2 but it should be $PROJ_ROOT."
 
+  log "Testing that unique names include parts of the project root dir."
   EXPECTED_PROJ_DIRNAME=$(basename $PROJ_ROOT)
-  # Unique names should include parts of the project root dir.
   grep "$EXPECTED_PROJ_DIRNAME" <(uniqueName) &>/dev/null || die "Unique name should include the project dir name."
   
-  # Docker image in a bitbucket pipeline.
+  log "Testing docker image name in a bitbucket pipeline."
   IMAGENAME=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef image)
-  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected 'reponame:build-999-feedbee' but got '$IMAGENAME'"
+  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected reponame:build-999-feedbee but got $IMAGENAME."
 
-  # Docker image in a travis ci
+  log "Testing docker image name in a travis ci."
   IMAGENAME=$(DOCKER_REPO=reponame TRAVIS_BUILD_NUMBER=999 TRAVIS_COMMIT=feedbeef image)
-  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected 'reponame:build-999-feedbee' but got '$IMAGENAME'"
+  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected reponame:build-999-feedbee but got $IMAGENAME."
 
-  # Docker image in a circle ci
+  log "Testing docker image name in a circle ci."
   IMAGENAME=$(DOCKER_REPO=reponame CIRCLE_BUILD_NUM=999 CIRCLE_SHA1=feedbeef image)
-  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected 'reponame:build-999-feedbee' but got '$IMAGENAME'"
+  [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected reponame:build-999-feedbee but got $IMAGENAME."
 
-  # Namespace when explicitly set.
+  log "Testing namespace name when explicitly set."
   EXPLICIT_NAMESPACE=$(NAMESPACE=somens-dev namespace)
-  [ "somens-dev" = "$EXPLICIT_NAMESPACE" ] || die "Expected explicit ns to be somens-dev. Got $EXPLICIT_NAMESPACE"
+  [ "somens-dev" = "$EXPLICIT_NAMESPACE" ] || die "Expected explicit ns to be somens-dev. Got $EXPLICIT_NAMESPACE."
   
-  # Namespace when default should include the project dir.
+  log "Testing namespace name when using a default value."
   DEFAULT_NAMESPACE=$(namespace)
-  [[ "$DEFAULT_NAMESPACE" == *"$EXPECTED_PROJ_DIRNAME"* ]] || die "Local k8s namespace didnt include $EXPECT. Got $DEFAULT_NAMESPACE"
+  [[ "$DEFAULT_NAMESPACE" == *"$EXPECTED_PROJ_DIRNAME"* ]] || die "Local k8s namespace didnt include $EXPECT. Got $DEFAULT_NAMESPACE."
 
   ##
-  ## Scenarios
+  ## Test stories.
   ##
   
-  ## Building a docker image on a dev workstation without kubernetes configured should be to the unique name without any repo server
+  log "Story: Building a docker image on a dev workstation without kubernetes configured should result in a unique image name without any repo server."
   function getK8sClusterServer() { return 0; }
   LOCAL_DOCKER_IMAGE=$(PROJ_ROOT=/tmp image)
   [ "$LOCAL_DOCKER_IMAGE" = "tmp:latest" ] || die "Expected docker image to be tmp:latest. Got $LOCAL_DOCKER_IMAGE."
 
-  ## Building a docker image on a dev with a local kubernetes should push to the local k8s repo and have a unique name namespace.
+  log "Story: Building a docker image on a dev with a local kubernetes should result in a unique name on a local docker repo and the same unique name as a namspace."
   function getK8sClusterServer() { echo "https://127.0.0.1"; }
-  LOCAL_K8S_IMAGE=$(PROJ_ROOT=/tmp image)
-  # docker build -t $LOCAL_K8S_IMAGE .
-  [ "$LOCAL_K8S_IMAGE" = "localhost:32000/tmp:latest" ] || die "Image name for local k8s should be localhost:32000/tmp:latest. Got $LOCAL_K8S_IMAGE"
-  LOCAL_K8S_NS=$(PROJ_ROOT=/tmp namespace)
-  # kubectl -n $LOCAL_K8S_NS apply -f resources/
-  [ "$LOCAL_K8S_NS" = "tmp" ] || die "Namespace for local k8s should be tmp. Got $LOCAL_K8S_NS"
+  source <(PROJ_ROOT=/tmp projenv)
+  # docker build -t $PROJ_DOCKER_IMAGE .
+  [ "$PROJ_DOCKER_IMAGE" = "localhost:32000/tmp:latest" ] || die "Image name for local k8s should be localhost:32000/tmp:latest. Got $PROJ_DOCKER_IMAGE."
+  # kubectl -n $PROJ_NAMESPACE apply -f resources/
+  [ "$PROJ_NAMESPACE" = "tmp" ] || die "Namespace for local k8s should be tmp. Got $PROJ_NAMESPACE."
 
-  ## Building a docker in a bitbucket build pipeline should push to somewhere else 
-  BITBUCKET_IMAGE=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef NAMESPACE=somens image)
-  [ "$BITBUCKET_IMAGE" = "reponame:build-999-feedbee" ] || die "Bitbucket pipeline image name should be reponame:build-999-feebee"
+  log "Story: Building a docker in a bitbucket build pipeline should yield an explicit repo name with build info in the tag and an explicit namespace."
+  source <(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef NAMESPACE=somens projenv)
   # docker build -t $BITBUCKET_IMAGE
-  BITBUCKET_NS=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef NAMESPACE=somens namespace)
-  # kubectl -n $BITBUCKET_NS apply -f resources/
-  [ "$BITBUCKET_NS" = "somens" ] || die "Bitbucket pipeline image name should be reponame:build-999-feebee"
+  [ "$PROJ_DOCKER_IMAGE" = "reponame:build-999-feedbee" ] || die "Bitbucket pipeline image name should be reponame:build-999-feebee."
+  # kubectl -n $PROJ_NAMESPACE apply -f resources/
+  [ "$PROJ_NAMESPACE" = "somens" ] || die "Bitbucket pipeline image name should be reponame:build-999-feebee."
+
+  log "Self test succeeded."
 }
 
 PROJ_ROOT=$(realpath $(dirname $PWD))
 case "$1" in
   selftest) selftest ;;
   env) projenv ;;
+  projenv) projenv ;;
 esac
