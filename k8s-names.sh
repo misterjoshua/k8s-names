@@ -85,13 +85,16 @@ function repo() {
 }
 
 # Tag name for docker image.
+# Use an explicit docker tag if present
 # Use a bitbucket build number to generate a name if it's possible
 # Otherwise, use 'latest'
 function tag() {
   BUILD_NUMBER="$BITBUCKET_BUILD_NUMBER$TRAVIS_BUILD_NUMBER$CIRCLE_BUILD_NUM"
   COMMIT="$BITBUCKET_COMMIT$TRAVIS_COMMIT$CIRCLE_SHA1"
 
-  if [ ! -z "$BUILD_NUMBER" ]; then
+  if [ ! -z "$DOCKER_TAG" ]; then
+    echo "$DOCKER_TAG"
+  elif [ ! -z "$BUILD_NUMBER" ]; then
     # In the pipeline, tag the image by build number and part of the commit hash
     echo "build-$BUILD_NUMBER-$(cut -b1-7 <<<$COMMIT)"
   else
@@ -141,6 +144,9 @@ function selftest() {
   log "Testing docker image name in a bitbucket pipeline."
   IMAGENAME=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef image)
   [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected reponame:build-999-feedbee but got $IMAGENAME."
+
+  IMAGENAME=$(DOCKER_REPO=reponame DOCKER_TAG=latest image)
+  [ "reponame:latest" = "$IMAGENAME" ] || die "Expected reponame:latest but got $IMAGENAME."
 
   log "Testing docker image name in a travis ci."
   IMAGENAME=$(DOCKER_REPO=reponame TRAVIS_BUILD_NUMBER=999 TRAVIS_COMMIT=feedbeef image)
