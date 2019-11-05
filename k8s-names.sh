@@ -165,18 +165,25 @@ function selftest() {
   log "Story: Building a docker image on a dev workstation without kubernetes configured should result in a unique image name without any repo server."
   function getK8sClusterServer() { return 0; }
   LOCAL_DOCKER_IMAGE=$(PROJ_ROOT=/tmp image)
-  [ "$LOCAL_DOCKER_IMAGE" = "tmp:latest" ] || die "Expected docker image to be tmp:latest. Got $LOCAL_DOCKER_IMAGE."
+  ENV=$(PROJ_ROOT=/tmp projenv)
+  source <(echo $ENV)
+  [ "$PROJ_DOCKER_IMAGE" = "tmp:latest" ] || die "Expected docker image to be tmp:latest. Got $LOCAL_DOCKER_IMAGE."
 
   log "Story: Building a docker image on a dev with a local kubernetes should result in a unique name on a local docker repo and the same unique name as a namspace."
   function getK8sClusterServer() { echo "https://127.0.0.1"; }
-  source <(PROJ_ROOT=/tmp projenv)
+  ENV=$(PROJ_ROOT=/tmp projenv)
+  log $ENV
+  source <(echo $ENV)
   # docker build -t $PROJ_DOCKER_IMAGE .
   [ "$PROJ_DOCKER_IMAGE" = "localhost:32000/tmp:latest" ] || die "Image name for local k8s should be localhost:32000/tmp:latest. Got $PROJ_DOCKER_IMAGE."
   # kubectl -n $PROJ_NAMESPACE apply -f resources/
   [ "$PROJ_NAMESPACE" = "tmp" ] || die "Namespace for local k8s should be tmp. Got $PROJ_NAMESPACE."
 
   log "Story: Building a docker in a bitbucket build pipeline should yield an explicit repo name with build info in the tag and an explicit namespace."
-  source <(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef NAMESPACE=somens projenv)
+  function getK8sClusterServer() { echo "https://somecluster.hcp.someregion.azmk8s.io:443"; }
+  ENV=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef NAMESPACE=somens projenv)
+  log $ENV
+  source <(echo $ENV)
   # docker build -t $BITBUCKET_IMAGE
   [ "$PROJ_DOCKER_IMAGE" = "reponame:build-999-feedbee" ] || die "Bitbucket pipeline image name should be reponame:build-999-feebee."
   # kubectl -n $PROJ_NAMESPACE apply -f resources/
