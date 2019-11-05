@@ -192,7 +192,7 @@ function selftest() {
   log "Self test succeeded."
 }
 
-PROJ_ROOT=$(realpath $(dirname $PWD))
+PROJ_ROOT=${PROJ_ROOT:-$(realpath $PWD)}
 case "$1" in
   selftest) selftest ;;
   env) projenv ;;
