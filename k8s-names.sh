@@ -145,6 +145,7 @@ function selftest() {
   IMAGENAME=$(DOCKER_REPO=reponame BITBUCKET_BUILD_NUMBER=999 BITBUCKET_COMMIT=feedbeef image)
   [ "reponame:build-999-feedbee" = "$IMAGENAME" ] || die "Expected reponame:build-999-feedbee but got $IMAGENAME."
 
+  log "Testing docker image name with an explicit tag override."
   IMAGENAME=$(DOCKER_REPO=reponame DOCKER_TAG=latest image)
   [ "reponame:latest" = "$IMAGENAME" ] || die "Expected reponame:latest but got $IMAGENAME."
 
