@@ -34,6 +34,12 @@ PROJ_IP=192.168.1.110
 
 # Import the variables
 $ source <(./k8s-names.sh env)
+
+# One-liner to use the env vars from the web
+$ source <(bash <(curl https://raw.githubusercontent.com/misterjoshua/k8s-names/master/k8s-names.sh) env)
+
+$ echo $PROJ_NAMESPACE
+/home/user/proj/myotherproj
 ```
 
 ## Output Environment Variables
@@ -64,8 +70,7 @@ You may provide configuration to override the conventions of this script.
 ```
 language: generic
 script:
-- curl -LO https://raw.githubusercontent.com/misterjoshua/k8s-names/master/k8s-names.sh && chmod +x ./k8s-names.sh && ./k8s-names.sh selftest
-- source <(./k8s-names.sh env)
+- source <(bash <(curl https://raw.githubusercontent.com/misterjoshua/k8s-names/master/k8s-names.sh) env)
 - docker build -t $PROJ_DOCKER_IMAGE .
 - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 - docker push $PROJ_DOCKER_IMAGE
