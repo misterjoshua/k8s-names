@@ -65,7 +65,7 @@ You may provide configuration to override the conventions of this script.
 | `DOCKER_TAG` | Explicitly set the docker image tag. You might want to set it to `latest` if you're pushing semantically versioned docker images.
 | `NAMESPACE` | Explicitly set the namespace. You might set this at the pipeline step level.
 
-## Pipeline Examples
+## Travis CI Pipeline Example
 
 ```
 language: generic
